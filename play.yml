@@ -1,0 +1,53 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: Install Python3
+      apt: name=python3 update_cache=yes state=latest
+
+    - name: Install Git package
+      apt: name=git update_cache=yes state=latest
+
+    - name: ensure apache is at the latest version
+      apt: name=apache2 update_cache=yes state=latest
+
+    - name: enabled mod_rewrite
+      apache2_module: name=rewrite state=present
+
+    - name: apache2 listen on port 8080
+      lineinfile: dest=/etc/apache2/ports.conf regexp="^Listen 80" line="Listen 8080" state=present
+
+    - name: apache2 virtualhost on port 8080
+      lineinfile: dest=/etc/apache2/sites-available/000-default.conf regexp="^<VirtualHost \*:80>" line="<VirtualHost *:8080>" state=present
+
+    - name: remove default website directory
+      file:
+        path: /var/www/html
+        state: absent
+
+    - name: Git checkout website
+      git:
+        repo: https://github.com/cloudacademy/static-website-example.git
+        dest: /var/www/html
+        clone: yes
+        update: yes
+        force: yes
+      notify:
+        - restart apache2
+
+    - name: UFW - Allow HTTP on port 22
+      ufw:
+        state: enabled
+        rule: allow
+        port: 22
+        proto: tcp
+
+    - name: UFW - Allow HTTP on port 8080
+      ufw:
+        rule: allow
+        port: 8080
+        proto: tcp
+
+  handlers:
+    - name: restart apache2
+      service: name=apache2 state=restarted
